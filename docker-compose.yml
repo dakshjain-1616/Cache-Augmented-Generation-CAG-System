@@ -1,0 +1,139 @@
+# Cache-Augmented Generation (CAG) System - Docker Compose
+# Multi-service setup with GPU support
+
+version: '3.8'
+
+services:
+  # GPU Server - llama.cpp with CUDA support
+  gpu-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cag-gpu-server:latest
+    container_name: cag-gpu-server
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+      - LLAMA_CPP_PORT=8080
+      - GPU_AVAILABLE=true
+    volumes:
+      - ./kv_slots:/app/kv_slots
+      - ./corpora:/app/corpora
+      - ./models:/app/models
+      - ./manifest.json:/app/manifest.json:rw
+    ports:
+      - "8080:8080"
+    command: >
+      /usr/local/bin/llama-server
+      --model /app/models/${MODEL_NAME:-qwen2.5-3b-instruct-q4_k_m.gguf}
+      --ctx-size ${CTX_SIZE:-8192}
+      --port 8080
+      --host 0.0.0.0
+      --n-gpu-layers 999
+      --parallel 4
+      --ubatch-size 128
+      --parallel 1
+      --slot-save-path /app/kv_slots
+      --rope-scaling yarn
+      --rope-scale 4.0
+      --yarn-orig-ctx 131072
+      --flash-attn
+      --metrics
+      --slots
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - cag-network
+    restart: unless-stopped
+
+  # API Server - FastAPI application
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cag-api:latest
+    container_name: cag-api-server
+    environment:
+      - LLAMA_CPP_PORT=8080
+      - API_PORT=8000
+      - KV_SLOTS_DIR=/app/kv_slots
+      - CORPORA_DIR=/app/corpora
+      - LLAMA_SERVER_HOST=gpu-server
+    volumes:
+      - ./kv_slots:/app/kv_slots:rw
+      - ./corpora:/app/corpora:rw
+      - ./models:/app/models:ro
+      - ./manifest.json:/app/manifest.json:rw
+      - ./.env:/app/.env:ro
+    ports:
+      - "8000:8000"
+    command: >
+      python3 /app/api_server.py
+      --host 0.0.0.0
+      --port 8000
+    depends_on:
+      gpu-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - cag-network
+    restart: unless-stopped
+
+  # Demo service - runs end-to-end demo
+  demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cag-demo:latest
+    container_name: cag-demo
+    environment:
+      - LLAMA_CPP_URL=http://gpu-server:8080
+      - API_URL=http://api:8000
+    volumes:
+      - ./kv_slots:/app/kv_slots:rw
+      - ./corpora:/app/corpora:rw
+      - ./models:/app/models:ro
+      - ./manifest.json:/app/manifest.json:rw
+    command: >
+      python3 /app/demo.py
+      --llama-url http://gpu-server:8080
+      --api-url http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - cag-network
+    profiles:
+      - demo
+    restart: "no"
+
+networks:
+  cag-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  kv_slots:
+    driver: local
+  corpora:
+    driver: local
+  models:
+    driver: local

@@ -1,0 +1,49 @@
+# ── Models (large GGUF files, download via setup.sh) ─────────────────────────
+models/
+*.gguf
+*.ggml
+
+# ── KV Cache slots (runtime binary files, can be GBs each) ───────────────────
+kv_slots/
+*.bin
+*.slot
+
+# ── Runtime state ─────────────────────────────────────────────────────────────
+.env
+manifest.json
+jobs.json
+server.log
+corpora/
+
+# ── llama.cpp build (cloned + compiled by setup.sh) ──────────────────────────
+llama-cpp-turboquant/
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+.dockerignore
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.code-workspace
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/

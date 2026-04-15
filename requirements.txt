@@ -1,0 +1,19 @@
+# Cache-Augmented Generation (CAG) System - Python Dependencies
+
+# HTTP clients
+requests>=2.31.0
+httpx>=0.25.0
+
+# FastAPI and ASGI server
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Data validation
+pydantic>=2.5.0
+
+# Utilities
+python-dotenv>=1.0.0
+tqdm>=4.66.0
+
+# PDF support for document ingestion
+pypdf>=3.0.0
