@@ -1,7 +1,7 @@
 # Cache-Augmented Generation (CAG) System
 
 [![Built with NEO](https://img.shields.io/badge/Built%20with-NEO%20AI%20Agent-6366f1?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMSAxNXYtNEg3bDUtOXY0aDRsLTUgOXoiLz48L3N2Zz4=)](https://heyneo.com)
-[![NEO VS Code Extension](https://img.shields.io/visual-studio-marketplace/v/NeoResearchInc.heyneo?style=for-the-badge&label=NEO%20for%20VS%20Code&logo=visualstudiocode&logoColor=white&color=0078d7)](https://marketplace.visualstudio.com/items?itemName=NeoResearchInc.heyneo)
+[![NEO for VS Code](https://img.shields.io/badge/VS%20Code-Install%20Extension-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=NeoResearchInc.heyneo)
 
 > This entire implementation — setup, debugging, GPU validation, and documentation — was built autonomously using **[NEO](https://heyneo.com)**, an autonomous AI agent. NEO wrote, debugged, and tested all the code, fixed 9 bugs across CUDA/Python/shell, and ran 11 GPU validation tests end-to-end. Try NEO in your IDE with the [VS Code extension](https://marketplace.visualstudio.com/items?itemName=NeoResearchInc.heyneo).
 
