@@ -1,5 +1,12 @@
 # Cache-Augmented Generation (CAG) System
 
+[![Built with NEO](https://img.shields.io/badge/Built%20with-NEO%20AI%20Agent-6366f1?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMSAxNXYtNEg3bDUtOXY0aDRsLTUgOXoiLz48L3N2Zz4=)](https://heyneo.com)
+[![NEO VS Code Extension](https://img.shields.io/visual-studio-marketplace/v/NeoResearchInc.heyneo?style=for-the-badge&label=NEO%20for%20VS%20Code&logo=visualstudiocode&logoColor=white&color=0078d7)](https://marketplace.visualstudio.com/items?itemName=NeoResearchInc.heyneo)
+
+> This entire implementation — setup, debugging, GPU validation, and documentation — was built autonomously using **[NEO](https://heyneo.com)**, an autonomous AI agent. NEO wrote, debugged, and tested all the code, fixed 9 bugs across CUDA/Python/shell, and ran 11 GPU validation tests end-to-end. Try NEO in your IDE with the [VS Code extension](https://marketplace.visualstudio.com/items?itemName=NeoResearchInc.heyneo).
+
+---
+
 A **RAG-less** document QA system using long-context LLM + KV cache as a persistent document store. No embeddings, no vector DB, no chunking, no retrieval pipeline.
 
 ## Overview
@@ -39,52 +46,62 @@ CAG simply:
 
 ## Key Components
 
-### 1. `setup.sh` - Environment Setup
+### 1. `setup.sh` — Environment Setup
 - Detects GPU VRAM
 - Clones and builds llama.cpp with CUDA support
 - Downloads appropriate Qwen GGUF model based on available VRAM
 - Creates directory structure and configuration
 
-### 2. `start_server.sh` - LLM Server
+### 2. `start_server.sh` — LLM Server
 - Launches llama-server with optimal settings
 - Enables YaRN RoPE scaling for long contexts
-- Configures flash attention for efficiency
-- Sets up KV slot persistence
+- Configures TurboQuant KV compression (`turbo3`)
+- Sets up Flash Attention and KV slot persistence
 
-### 3. `ingest.py` - Document Ingestion
-- Reads documents from files or stdin
+### 3. `src/ingest.py` — Document Ingestion
+- Reads `.txt`, `.md`, or `.pdf` files (or stdin)
 - Creates structured prompts for ingestion
 - POSTs to llama-server to prefill KV cache
-- Saves KV slot via API
-- Records metadata to manifest.json
+- Saves KV slot to `kv_slots/` via API
+- Records metadata to `manifest.json`
 
-### 4. `query.py` - Query Tool
-- Restores KV slot by corpus_id
+### 4. `src/query.py` — Query Tool
+- Restores KV slot by corpus ID
 - Appends user question to cached context
-- Streams LLM response
+- Streams LLM response to stdout
 - Reports restore time and decode speed
 
-### 5. `api_server.py` - REST API
+### 5. `src/api_server.py` — REST API
 - FastAPI server with endpoints:
-  - `POST /ingest` - Ingest documents
-  - `GET /status/{job_id}` - Check ingestion status
-  - `POST /query` - Query a corpus
-  - `GET /corpora` - List available corpora
-  - `GET /health` - Health check
+  - `POST /ingest` — Ingest documents (async background job)
+  - `GET /status/{job_id}` — Check ingestion status
+  - `POST /query` — Query a corpus (streaming or non-streaming)
+  - `GET /corpora` — List available corpora
+  - `DELETE /corpora/{id}` — Delete a corpus
+  - `GET /health` — Health check
 
-### 6. `demo.py` - End-to-End Demo
+### 6. `src/demo.py` — End-to-End Demo
 - Downloads sample texts (Alice in Wonderland, Peter Pan)
-- Ingests documents into KV cache
-- Runs test questions
-- Prints performance statistics
+- Ingests them via the REST API
+- Runs 6 test questions and prints answers
+- Prints performance statistics (restore time, decode speed)
 
 ## Quick Start
 
 ### Prerequisites
 
-- Linux with CUDA support (for GPU acceleration)
-- Python 3.8+
-- Docker and Docker Compose (optional)
+| Requirement | Notes |
+|---|---|
+| **OS** | Linux (Ubuntu 20.04+ recommended) |
+| **GPU** | NVIDIA GPU with CUDA 11.8+ — see VRAM table below |
+| **VRAM** | 8 GB minimum (CPU fallback available but slow) |
+| **RAM** | 16 GB+ recommended |
+| **Disk** | 20 GB free (model ~16 GB + KV slots up to 3 GB each) |
+| **Python** | 3.8+ |
+| **Build tools** | `cmake`, `build-essential`, `git` (installed by `setup.sh`) |
+| **Docker** | Optional — only needed for containerised deployment |
+
+> **Windows / macOS:** not supported. llama.cpp CUDA builds require Linux. WSL2 on Windows may work but is untested.
 
 ### Local Installation
 
@@ -100,26 +117,26 @@ cd cache-augmented-generation
 ./start_server.sh
 
 # 4. Ingest a document
-python ingest.py my_document.txt --corpus-id my_doc --description "My document"
+python3 src/ingest.py my_document.txt --corpus-id my_doc --description "My document"
 
 # 5. Query the document
-python query.py my_doc "What is this document about?"
+python3 src/query.py my_doc "What is this document about?"
 ```
 
 ### Docker Deployment
 
 ```bash
 # Build and start services
-docker-compose up -d
+docker-compose -f docker/docker-compose.yml up -d
 
 # Run demo
-docker-compose --profile demo run demo
+docker-compose -f docker/docker-compose.yml --profile demo run demo
 
 # View logs
-docker-compose logs -f
+docker-compose -f docker/docker-compose.yml logs -f
 
 # Stop services
-docker-compose down
+docker-compose -f docker/docker-compose.yml down
 ```
 
 ## Usage Examples
@@ -128,36 +145,36 @@ docker-compose down
 
 ```bash
 # From file
-python ingest.py document.txt --corpus-id report_2024 --description "Annual report"
+python3 src/ingest.py document.txt --corpus-id report_2024 --description "Annual report"
 
 # From stdin
-cat document.txt | python ingest.py --corpus-id report_2024
+cat document.txt | python3 src/ingest.py --corpus-id report_2024
 
-# Multiple documents
-python ingest.py doc1.txt doc2.txt doc3.txt --corpus-id collection
+# From a directory of .txt/.md/.pdf files
+python3 src/ingest.py --corpus-dir ./my_docs --corpus-id collection
 ```
 
 ### Querying Documents
 
 ```bash
 # Basic query
-python query.py report_2024 "What were the main findings?"
+python3 src/query.py report_2024 "What were the main findings?"
 
 # With custom parameters
-python query.py report_2024 "Summarize the conclusion" --max-tokens 256 --temperature 0.5
+python3 src/query.py report_2024 "Summarize the conclusion" --max-tokens 256 --temperature 0.5
 
 # List available corpora
-python query.py --list
+python3 src/query.py --list
 ```
 
 ### Using the API
 
 ```bash
 # Start API server
-python api_server.py --port 8000
+python3 src/api_server.py --port 8000
 
 # Optional: enable API key auth
-CAG_API_KEY=mysecretkey python api_server.py
+CAG_API_KEY=mysecretkey python3 src/api_server.py
 
 # Ingest via API
 curl -X POST http://localhost:8000/ingest \
@@ -341,22 +358,48 @@ Health check endpoint.
 
 ```
 .
-├── setup.sh              # Environment setup
-├── start_server.sh      # Launch llama-server
-├── ingest.py            # Document ingestion
-├── query.py             # Query tool
-├── api_server.py        # FastAPI server
-├── demo.py              # End-to-end demo
-├── Dockerfile           # Container definition
-├── docker-compose.yml   # Multi-service setup
-├── requirements.txt     # Python dependencies
-├── README.md            # This file
-├── .env                 # Environment configuration
-├── manifest.json        # Corpus metadata
-├── kv_slots/            # KV cache storage
-├── corpora/             # Document storage
-└── models/              # GGUF model files
+├── setup.sh              # Environment setup — builds llama.cpp, downloads model
+├── start_server.sh       # Launch llama-server with CAG-optimised flags
+├── requirements.txt      # Python dependencies
+├── README.md             # This file
+├── .env                  # Environment configuration (auto-generated by setup.sh)
+├── manifest.json         # Corpus metadata (runtime, not committed)
+├── jobs.json             # Ingestion job state (runtime, not committed)
+│
+├── src/                  # Python source
+│   ├── api_server.py     # FastAPI REST API
+│   ├── ingest.py         # CLI: ingest a document
+│   ├── query.py          # CLI: query a corpus
+│   └── demo.py           # End-to-end demo (Alice + Peter Pan)
+│
+├── docker/               # Container setup
+│   ├── Dockerfile        # Multi-stage CUDA image
+│   └── docker-compose.yml
+│
+├── docs/                 # Documentation
+│   ├── REPORT.md         # Full GPU validation report
+│   └── GPU_TESTING.md    # GPU test checklist
+│
+├── models/               # GGUF model weights (not committed)
+├── kv_slots/             # Saved KV cache .bin files (not committed)
+├── corpora/              # Raw document storage (not committed)
+└── logs/                 # Runtime logs (not committed)
 ```
+
+## Limitations
+
+Understanding these upfront will save you debugging time:
+
+| Limitation | Detail |
+|---|---|
+| **Linux + NVIDIA only** | The TurboQuant CUDA kernels require a Linux NVIDIA GPU. No Windows, no macOS, no AMD/Apple Silicon. |
+| **Long first prefill** | A 900K-token document takes ~24 min to prefill on an A6000. This is a one-time cost per document — subsequent queries restore in ~1–2 seconds. |
+| **VRAM gating** | Below 24 GB VRAM you get a smaller model with a shorter context window (see model selection table). Sub-8 GB falls back to CPU, which is very slow. |
+| **One slot, one document** | The current implementation uses a single llama.cpp slot (slot 0). Only one corpus can be active at a time. Switching corpora requires a slot restore (~1 sec). |
+| **Lost-in-the-middle** | With YaRN 4× context extension (262K → 1M tokens), the model attends strongly to the beginning and end of the document but can miss content in the middle. Works best for targeted questions about known sections. |
+| **Build time** | First-time `./setup.sh` takes ~35 minutes to compile hundreds of CUDA Flash Attention kernel templates. This is a one-time cost. |
+| **No streaming in CLI** | `query.py` streams tokens to stdout. The REST API supports both streaming (`stream: true`) and non-streaming responses. |
+| **Model download requires HF token** | The Qwen3.5-35B model is gated on HuggingFace. You need a free HF account and access token for the 24 GB+ path. Smaller models are public. |
 
 ## Troubleshooting
 
@@ -412,20 +455,22 @@ MIT License - See LICENSE file for details.
 
 ## GPU Testing
 
-Before deploying, validate on real GPU hardware using the checklist in **`GPU_TESTING.md`**.
+All 11 GPU validation tests have been run and passed on an NVIDIA RTX A6000 (48 GB).
+See **`docs/REPORT.md`** for full results, and **`docs/GPU_TESTING.md`** for the test checklist.
 
-Critical GPU-only steps not yet validated:
-- TurboQuant `--cache-type-k q3_K --cache-type-v q3_K` flags (add to `start_server.sh`)
-- Actual VRAM utilisation at 1M context
-- YaRN quality at 905K token depth
-- Slot restore timing
+Key validated results:
+- TurboQuant `turbo3` KV compression: 23 GB → 4 GB at 1M context ✅
+- YaRN 4× context extension: 262K → 1,048,576 tokens ✅
+- War and Peace (922K tokens) prefilled in **24 minutes**, restored in **1.2 seconds** ✅
+- Decode speed: **~100 tok/s** at full 1M context ✅
 
 ## Acknowledgments
 
-- [llama-cpp-turboquant](https://github.com/atomicmilkshake/llama-cpp-turboquant) - TurboQuant fork with KV compression
-- [Han Xiao / Jina AI](https://www.linkedin.com/in/hxiao87) - Original CAG concept and demo
-- [Qwen](https://github.com/QwenLM/Qwen) - Qwen3.5-35B-A3B model
-- [FastAPI](https://fastapi.tiangolo.com/) - REST API framework
+- [NEO](https://heyneo.com) — Autonomous AI agent that built, debugged, and validated this entire implementation. Also available as a [VS Code extension](https://marketplace.visualstudio.com/items?itemName=NeoResearchInc.heyneo).
+- [llama-cpp-turboquant](https://github.com/atomicmilkshake/llama-cpp-turboquant) — TurboQuant fork with KV compression
+- [Han Xiao / Jina AI](https://www.linkedin.com/in/hxiao87) — Original CAG concept and demo
+- [Qwen](https://github.com/QwenLM/Qwen) — Qwen3.5-35B-A3B model
+- [FastAPI](https://fastapi.tiangolo.com/) — REST API framework
 
 ## Citation
 

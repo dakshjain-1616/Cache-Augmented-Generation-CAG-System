@@ -131,7 +131,7 @@ def ingest_document(
     # Prepare the request for llama-server
     payload = {
         "prompt": prompt,
-        "slot_id": slot_id,
+        "id_slot": slot_id,
         "n_predict": 0,
         "temperature": 0.0,
         "stop": ["<|im_end|>"],
@@ -237,7 +237,7 @@ def main():
     args = parser.parse_args()
     
     # Determine project directory
-    script_dir = Path(__file__).parent.resolve()
+    script_dir = Path(__file__).parent.parent.resolve()
     
     # Load environment
     env = load_env(script_dir)

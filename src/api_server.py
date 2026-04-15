@@ -227,12 +227,12 @@ def ingest_documents_task(
     try:
         # Create the ingestion prompt
         prompt = create_ingestion_prompt(documents, corpus_id, description)
-        slot_id = str(uuid.uuid4())[:8]
-        
+        slot_id = 0  # llama.cpp uses integer slot IDs; CAG uses slot 0
+
         # Send to llama-server
         payload = {
             "prompt": prompt,
-            "slot_id": slot_id,
+            "id_slot": slot_id,
             "n_predict": 100,
             "temperature": 0.0,
             "stop": ["<|im_end|>"],
@@ -305,7 +305,7 @@ async def lifespan(app: FastAPI):
     global slot_lock
     slot_lock = asyncio.Lock()   # must be created inside the running event loop
 
-    script_dir = Path(__file__).parent.resolve()
+    script_dir = Path(__file__).parent.parent.resolve()
     app_state["project_dir"] = script_dir
     app_state["env"] = load_env(script_dir)
     llama_host = os.environ.get("LLAMA_SERVER_HOST", "localhost")
@@ -422,38 +422,36 @@ async def query_corpus(request: QueryRequest):
     slot_id = corpus.get("slot_id")
     slot_file = corpus.get("slot_file")
     
-    if not slot_id:
+    if slot_id is None:
         raise HTTPException(status_code=500, detail="Corpus missing slot_id")
     
     # Restore slot
     restore_start = time.time()
     
     try:
-        # Check if slot exists
-        slots_response = requests.get(f"{app_state['llama_server_url']}/slots", timeout=10)
-        existing_slots = []
-        if slots_response.status_code == 200:
-            existing_slots = slots_response.json().get("slots", [])
-        
-        slot_exists = any(s.get("id") == slot_id for s in existing_slots)
-        
-        if not slot_exists and slot_file:
-            slot_path = app_state["kv_slots_dir"] / slot_file
+        # Always restore slot from disk before querying
+        if slot_file:
+            slot_path = app_state["kv_slots_dir"] / Path(slot_file).name
             if slot_path.exists():
+                # filename must be relative to the slot-save-path directory
                 restore_payload = {
-                    "slot_id": slot_id,
-                    "filename": str(slot_path)
+                    "filename": Path(slot_file).name
                 }
-                
+
                 restore_response = requests.post(
                     f"{app_state['llama_server_url']}/slots/0?action=restore",
                     json=restore_payload,
                     timeout=120
                 )
-                
+
                 if restore_response.status_code != 200:
-                    raise HTTPException(status_code=500, detail="Failed to restore slot")
-    
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to restore slot: {restore_response.text}"
+                    )
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error restoring slot: {str(e)}")
     
@@ -464,7 +462,7 @@ async def query_corpus(request: QueryRequest):
     
     payload = {
         "prompt": prompt,
-        "slot_id": slot_id,
+        "id_slot": 0,
         "n_predict": request.max_tokens,
         "temperature": request.temperature,
         "stream": request.stream,
@@ -533,7 +531,7 @@ async def list_corpora():
         corpora.append(CorpusInfo(
             corpus_id=c.get("corpus_id", ""),
             description=c.get("description"),
-            slot_id=c.get("slot_id", ""),
+            slot_id=str(c.get("slot_id", "")),
             prompt_length=c.get("prompt_length", 0),
             prefill_ms=c.get("prefill_ms", 0),
             total_time_s=c.get("total_time_s", 0),

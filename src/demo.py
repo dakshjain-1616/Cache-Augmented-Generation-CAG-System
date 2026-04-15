@@ -216,7 +216,7 @@ def main():
     args = parser.parse_args()
     
     # Determine project directory
-    script_dir = Path(__file__).parent.resolve()
+    script_dir = Path(__file__).parent.parent.resolve()
     
     # Load environment
     env = load_env(script_dir)
@@ -283,7 +283,7 @@ def main():
         
         try:
             result = ingest_document_api(
-                api_url=api_url,
+                server_url=api_url,
                 documents=[doc['content']],
                 corpus_id=doc['corpus_id'],
                 description=doc['description']

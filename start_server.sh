@@ -75,8 +75,10 @@ exec "${SERVER_BIN}" \
     --rope-scaling yarn \
     --rope-scale 4.0 \
     --yarn-orig-ctx 131072 \
-    --flash-attn \
+    --flash-attn on \
+    --cache-type-k turbo3 \
+    --cache-type-v turbo3 \
     --metrics \
     --slots \
-    --log-format text \
+    --log-colors off \
     2>&1 | tee "${PROJECT_DIR}/server.log"

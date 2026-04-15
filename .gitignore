@@ -44,6 +44,12 @@ Thumbs.db
 .vscode/
 *.code-workspace
 
+# ── Claude Code session data ──────────────────────────────────────────────────
+.claude/
+
 # ── Logs ──────────────────────────────────────────────────────────────────────
 *.log
 logs/
+
+# ── Test data (large downloaded documents) ────────────────────────────────────
+test_data/

@@ -79,52 +79,36 @@ def query_corpus(
     """
     slot_id = 0  # llama.cpp slot IDs are integers; CAG uses slot 0
     slot_file = corpus.get("slot_file")
-    
-    if not slot_id:
-        print(f"[query] ✗ Error: No slot_id found for corpus {corpus.get('corpus_id')}")
-        return None
-    
+
     print(f"[query] Restoring KV slot: {slot_id}")
-    
+
     # Step 1: Restore the KV slot
     restore_start = time.time()
-    
+
     try:
-        # First, check if slot exists on server
-        slots_response = requests.get(f"{server_url}/slots", timeout=10)
-        existing_slots = []
-        if slots_response.status_code == 200:
-            existing_slots = slots_response.json().get("slots", [])
-        
-        # Find if our slot already exists
-        slot_exists = any(s.get("id") == slot_id for s in existing_slots)
-        
-        if not slot_exists and slot_file:
-            # Load from saved file
-            slot_path = kv_slots_dir / slot_file
+        # Always restore from disk — /slots returns a bare list, not {"slots":[...]}
+        if slot_file:
+            slot_path = kv_slots_dir / Path(slot_file).name
             if slot_path.exists():
                 restore_payload = {
-                    "slot_id": slot_id,
-                    "filename": str(slot_path)
+                    "filename": Path(slot_file).name
                 }
-                
+
                 restore_response = requests.post(
-                    f"{server_url}/slots/{slot_id}?action=restore",
+                    f"{server_url}/slots/0?action=restore",
                     json=restore_payload,
                     timeout=120
                 )
-                
+
                 if restore_response.status_code != 200:
                     print(f"[query] ✗ Error: Failed to restore slot: {restore_response.status_code}")
                     print(f"[query]    Response: {restore_response.text}")
                     return None
-                
+
                 print(f"[query] ✓ Slot restored from file")
             else:
                 print(f"[query] ✗ Error: Slot file not found: {slot_path}")
                 return None
-        else:
-            print(f"[query] ✓ Slot already active on server")
         
         restore_time = time.time() - restore_start
         print(f"[query]   Restore time: {restore_time*1000:.1f}ms")
@@ -142,7 +126,7 @@ def query_corpus(
     
     payload = {
         "prompt": prompt,
-        "slot_id": slot_id,
+        "id_slot": slot_id,
         "n_predict": max_tokens,
         "temperature": temperature,
         "stream": True,
@@ -261,7 +245,7 @@ def main():
     args = parser.parse_args()
     
     # Determine project directory
-    script_dir = Path(__file__).parent.resolve()
+    script_dir = Path(__file__).parent.parent.resolve()
     
     # Load environment
     env = load_env(script_dir)

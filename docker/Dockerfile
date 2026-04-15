@@ -59,16 +59,17 @@ COPY --from=builder /app/llama-cpp-turboquant/build/bin/llama-cli /usr/local/bin
 COPY requirements.txt .
 COPY setup.sh .
 COPY start_server.sh .
-COPY ingest.py .
-COPY query.py .
-COPY api_server.py .
-COPY demo.py .
+RUN mkdir -p /app/src
+COPY src/ingest.py src/ingest.py
+COPY src/query.py src/query.py
+COPY src/api_server.py src/api_server.py
+COPY src/demo.py src/demo.py
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Create directories
-RUN mkdir -p /app/models /app/kv_slots /app/corpora /app/src
+RUN mkdir -p /app/models /app/kv_slots /app/corpora
 
 # NOTE: Do not bake the model into the image — mount ./models as a volume
 # Download the model before running: see README.md for instructions
